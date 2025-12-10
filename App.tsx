@@ -24,6 +24,23 @@ import {
 import { GoogleGenAI } from "@google/genai";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc, collection, query, where, getDocs, Firestore } from "firebase/firestore";
+import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+
+// --- CONFIGURAZIONE FISSA (Spostata fuori) ---
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAj5Ya9w0YTHCU0ZGexD1SVcjlSPTVe5Uo",
+  authDomain: "sana-intraprendenza.firebaseapp.com",
+  projectId: "sana-intraprendenza",
+  storageBucket: "sana-intraprendenza.firebasestorage.app",
+  messagingSenderId: "1087913630556",
+  appId: "1:1087913630556:web:e4969c289f94023f98bf99",
+  measurementId: "G-ZVSB4JDVBC"
+};
+
+// Inizializza Firebase globalmente
+const app = initializeApp(FIREBASE_CONFIG);
+const db = getFirestore(app);
+const auth = getAuth(app); // Attiva Auth
 
 // --- Types ---
 
@@ -246,6 +263,38 @@ const AuthScreen = ({ onLogin, db, onOpenCloudConfig }: { onLogin: (userId: stri
     }
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      setLoading(true);
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const googleEmail = result.user.email?.toLowerCase();
+
+      if (!googleEmail) throw new Error("Email non trovata.");
+
+      // Controlla se questa email è associata a un socio nel TUO database
+      // Nota: 'db' è ora globale o passato come prop, assicurati che sia accessibile
+      const userDocRef = doc(db, "bar_users", googleEmail);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        // L'utente esiste già -> Login
+        onLogin(userDocSnap.data().linkedSocioId);
+      } else {
+        // L'utente non esiste -> Lo pre-compiliamo nel form di registrazione
+        setMode('REGISTER');
+        setEmail(googleEmail);
+        setPassword('google-auth-user'); // Password dummy, tanto usano Google
+        alert(`Ciao! L'email ${googleEmail} non è ancora registrata. Seleziona chi sei dal menu "CHI SEI?" e clicca Registrati.`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError("Errore login Google: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-brand-dark flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-brand-card p-8 rounded-2xl border border-brand-light/10 shadow-2xl relative">
@@ -318,7 +367,7 @@ const AuthScreen = ({ onLogin, db, onOpenCloudConfig }: { onLogin: (userId: stri
             <div className="relative flex justify-center"><span className="px-2 bg-brand-card text-xs text-brand-muted">OPPURE</span></div>
           </div>
 
-          <Button type="button" variant="secondary" className="w-full" onClick={() => alert("Per ora usa Email/Password. Google Login richiede configurazione backend aggiuntiva.")}>
+          <Button type="button" variant="secondary" className="w-full" onClick={handleGoogleLogin}>
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
             </svg>
