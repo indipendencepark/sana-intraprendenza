@@ -29,7 +29,7 @@ import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 // --- CONFIGURAZIONE FISSA (Spostata fuori) ---
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
+const FIREBASE_CONFIG = {
   apiKey: "AIzaSyAj5Ya9w0YTHCUOZGexD1SVcjlSPTVe5Uo",
   authDomain: "sana-intraprendenza.firebaseapp.com",
   projectId: "sana-intraprendenza",
