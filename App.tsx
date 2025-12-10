@@ -128,7 +128,7 @@ const INITIAL_PRODUCTS: Product[] = [
   { id: 'p7', name: 'Baiocchi pistacchio', stock: 15, sellPrice: 0.60, costPrice: 0.34, category: 'Dolci' },
 ];
 
-const INITIAL_CASH_START = 305.00;
+const INITIAL_CASH_START = 312.00;
 
 // --- Helper Components ---
 
@@ -428,43 +428,43 @@ export default function App() {
     }
   }, []);
 
-  // Initialize Data Source (Local or Cloud)
+// --- HARDCODED CONFIGURATION ---
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAj5Ya9w0YTHCU0ZGexD1SVcjlSPTVe5Uo",
+    authDomain: "sana-intraprendenza.firebaseapp.com",
+    projectId: "sana-intraprendenza",
+    storageBucket: "sana-intraprendenza.firebasestorage.app",
+    messagingSenderId: "1087913630556",
+    appId: "1:1087913630556:web:e4969c289f94023f98bf99",
+    measurementId: "G-ZVSB4JDVBC"
+  };
+
+  // Initialize Data Source (CLOUD ONLY)
   useEffect(() => {
-    const fbConfig = localStorage.getItem('bar_firebase_config');
-    
-    if (fbConfig) {
-      // 1. Try connect to Cloud
-      try {
-        const config = JSON.parse(fbConfig);
-        const app = initializeApp(config);
-        const db = getFirestore(app);
-        setFirebaseDb(db); // Save DB instance for Auth
+    try {
+      // Inizializza direttamente con la configurazione fissa
+      const app = initializeApp(FIREBASE_CONFIG);
+      const db = getFirestore(app);
+      setFirebaseDb(db); 
 
-        // Subscribe to real-time updates for APP DATA
-        const unsub = onSnapshot(doc(db, "bar_app", "main_state"), (doc) => {
-          if (doc.exists()) {
-            setData(doc.data() as AppDataState);
-          } else {
-            // First time cloud init: push local data to cloud
-            setDoc(doc.ref, data);
-          }
-        }, (error) => {
-          console.error("Cloud Error:", error);
-          alert("Errore connessione Cloud. Verifica configurazione.");
-        });
+      // Subscribe to real-time updates for APP DATA
+      const unsub = onSnapshot(doc(db, "bar_app", "main_state"), (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          setData(docSnapshot.data() as AppDataState);
+        } else {
+          // Se è la prima volta in assoluto e il DB è vuoto, crea il documento
+          // (Usa setDoc importato da firestore)
+          setDoc(doc(db, "bar_app", "main_state"), data); 
+        }
+      }, (error) => {
+        console.error("Cloud Error:", error);
+        alert("Errore connessione Cloud: " + error.message);
+      });
 
-        return () => unsub();
-      } catch (e) {
-        console.error("Firebase init failed", e);
-      }
-    } 
-    
-    // 2. Fallback to LocalStorage if no cloud config or failed (implicitly handles if db is null)
-    if (!fbConfig) {
-      const savedData = localStorage.getItem('bar_data_full');
-      if (savedData) {
-        setData(JSON.parse(savedData));
-      }
+      return () => unsub();
+    } catch (e) {
+      console.error("Firebase init failed", e);
+      alert("Impossibile connettersi al database.");
     }
   }, []);
 
