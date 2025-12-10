@@ -249,13 +249,6 @@ const AuthScreen = ({ onLogin, db, onOpenCloudConfig }: { onLogin: (userId: stri
   return (
     <div className="min-h-screen bg-brand-dark flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-brand-card p-8 rounded-2xl border border-brand-light/10 shadow-2xl relative">
-        <button 
-          onClick={onOpenCloudConfig}
-          className="absolute top-4 right-4 text-brand-muted hover:text-brand-light transition-colors"
-          title="Configura Database"
-        >
-          <Settings className={`w-5 h-5 ${db ? 'text-emerald-400' : ''}`} />
-        </button>
 
         <div className="text-center mb-8">
            <h1 className="font-black text-3xl tracking-tighter text-brand-light italic mb-2">Sana Intraprendenza</h1>
