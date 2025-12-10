@@ -27,10 +27,8 @@ import { getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc, collection, q
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 
 // --- CONFIGURAZIONE FISSA (Spostata fuori) ---
-
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAj5Ya9w0YTHCUOZGexD1SVcjlSPTVe5Uo",
+  apiKey: "AIzaSyAj5Ya9w0YTHCU0ZGexD1SVcjlSPTVe5Uo",
   authDomain: "sana-intraprendenza.firebaseapp.com",
   projectId: "sana-intraprendenza",
   storageBucket: "sana-intraprendenza.firebasestorage.app",
