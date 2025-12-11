@@ -915,7 +915,7 @@ export default function App() {
                   : 'bg-brand-card border-brand-light/10 hover:border-brand-light hover:bg-brand-card/80 active:scale-95'
               }`}
             >
-              <div className="flex justify-between w-full">
+              <div className="flex justify-between w-full items-start">
                 <span className="font-bold text-left line-clamp-2 text-brand-light">{p.name}</span>
                 <span className="text-xs font-mono bg-brand-dark px-1.5 py-0.5 rounded text-brand-muted">{p.stock}pz</span>
               </div>
