@@ -604,28 +604,31 @@ export default function App() {
     return { ...newData, logs: [newLog, ...newData.logs] };
   };
 
-  const processSale = (productId: string, targetUserId: string, isCash: boolean, guestName?: string) => {
+const processSale = (productId: string, targetUserId: string, isCash: boolean, guestName?: string, qty: number = 1) => {
     const product = data.products.find(p => p.id === productId);
     if (!product) return;
 
-    if (product.stock <= 0) {
-      alert("Prodotto esaurito!");
+    if (product.stock < qty) {
+      alert(`Quantità insufficiente! Disponibili solo ${product.stock} pz.`);
       return;
     }
 
     let newState = { ...data };
 
-    // 1. Update Stock
-    newState.products = newState.products.map(p => p.id === productId ? { ...p, stock: p.stock - 1 } : p);
+    // 1. Update Stock (sottrae la quantità selezionata)
+    newState.products = newState.products.map(p => p.id === productId ? { ...p, stock: p.stock - qty } : p);
 
     // 2. Financials
-    const value = product.sellPrice;
-    newState.cumulativeSales += value;
+    const unitPrice = product.sellPrice;
+    const totalValue = unitPrice * qty; // Calcola il totale
+    const logName = qty > 1 ? `${product.name} (x${qty})` : product.name; // Nome nel log
+
+    newState.cumulativeSales += totalValue;
 
     if (isCash) {
       // Cash Sale
-      newState.cashRegister = { ...newState.cashRegister, currentBalance: newState.cashRegister.currentBalance + value };
-      newState = addLog(newState, TransactionType.SALE_CASH, `Vendita Cassa: ${product.name}`, value);
+      newState.cashRegister = { ...newState.cashRegister, currentBalance: newState.cashRegister.currentBalance + totalValue };
+      newState = addLog(newState, TransactionType.SALE_CASH, `Vendita Cassa: ${logName}`, totalValue);
     } else {
       // Tab Sale
       let finalUserId = targetUserId;
@@ -642,8 +645,8 @@ export default function App() {
       const newItem: TabItem = {
         id: crypto.randomUUID(),
         productId: product.id,
-        productName: product.name,
-        price: value,
+        productName: logName, // Salva "Peroni (x2)" nel bollo
+        price: totalValue,
         timestamp: Date.now()
       };
 
@@ -651,17 +654,17 @@ export default function App() {
         newState.tabs = newState.tabs.map(t => t.userId === finalUserId ? {
           ...t,
           items: [...t.items, newItem],
-          totalOwed: t.totalOwed + value
+          totalOwed: t.totalOwed + totalValue
         } : t);
       } else {
         newState.tabs = [...newState.tabs, {
           userId: finalUserId,
           userName: finalUserName,
           items: [newItem],
-          totalOwed: value
+          totalOwed: totalValue
         }];
       }
-      newState = addLog(newState, TransactionType.SALE_TAB, `Bollo ${finalUserName}: ${product.name}`, value);
+      newState = addLog(newState, TransactionType.SALE_TAB, `Bollo ${finalUserName}: ${logName}`, totalValue);
     }
 
     saveData(newState);
@@ -887,18 +890,26 @@ export default function App() {
 // 2. POS / Vendita
   const POSView = () => {
     const [selectedProd, setSelectedProd] = useState<Product | null>(null);
+    const [quantity, setQuantity] = useState(1); // NUOVO STATO QUANTITÀ
     const [guestNameInput, setGuestNameInput] = useState('');
-    
-    // NUOVO STATO: Gestisce se siamo nella fase di scelta "chi paga"
     const [isTabSelectionMode, setIsTabSelectionMode] = useState(false);
 
-    // Resetta la modalità quando si chiude o si cambia prodotto
+    // Resetta tutto quando cambia prodotto
     useEffect(() => {
-      if (!selectedProd) {
+      if (selectedProd) {
+        setQuantity(1);
         setIsTabSelectionMode(false);
         setGuestNameInput('');
       }
     }, [selectedProd]);
+
+    const handleQuantityChange = (delta: number) => {
+      if (!selectedProd) return;
+      const newQty = quantity + delta;
+      if (newQty >= 1 && newQty <= selectedProd.stock) {
+        setQuantity(newQty);
+      }
+    };
 
     return (
       <div className="space-y-4 pb-24">
@@ -917,7 +928,7 @@ export default function App() {
             >
               <div className="flex justify-between w-full items-start">
                 <span className="font-bold text-left line-clamp-2 text-brand-light">{p.name}</span>
-                <span className="text-xs font-mono bg-brand-dark px-1.5 py-0.5 rounded text-brand-muted">{p.stock}pz</span>
+                <span className="text-xs font-mono bg-brand-dark px-1.5 py-0.5 rounded text-brand-muted shrink-0 ml-2">{p.stock}pz</span>
               </div>
               <span className="text-xl font-bold text-brand-light">{formatCurrency(p.sellPrice)}</span>
             </button>
@@ -931,7 +942,33 @@ export default function App() {
               
               <div className="text-center mb-6">
                  <h3 className="text-2xl font-bold mb-1 text-brand-light">{selectedProd.name}</h3>
-                 <p className="text-brand-muted text-lg">{formatCurrency(selectedProd.sellPrice)}</p>
+                 
+                 {/* PREZZO DINAMICO */}
+                 <p className="text-brand-muted text-lg mb-4">
+                   {formatCurrency(selectedProd.sellPrice * quantity)}
+                 </p>
+
+                 {/* SELETTORE QUANTITÀ */}
+                 <div className="flex items-center justify-center gap-4 bg-brand-input p-2 rounded-xl border border-brand-light/10 w-fit mx-auto">
+                    <button 
+                      onClick={() => handleQuantityChange(-1)}
+                      className="w-10 h-10 flex items-center justify-center rounded-lg bg-brand-card hover:bg-brand-light/10 text-brand-light disabled:opacity-30 active:scale-95 transition-all"
+                      disabled={quantity <= 1}
+                    >
+                      <span className="text-xl font-bold">-</span>
+                    </button>
+                    
+                    <span className="text-2xl font-bold text-brand-light w-8 tabular-nums">{quantity}</span>
+                    
+                    <button 
+                      onClick={() => handleQuantityChange(1)}
+                      className="w-10 h-10 flex items-center justify-center rounded-lg bg-brand-light text-brand-dark hover:bg-white active:scale-95 transition-all"
+                      disabled={quantity >= selectedProd.stock}
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                 </div>
+                 {quantity >= selectedProd.stock && <p className="text-xs text-red-400 mt-2">Max disponibile raggiunto</p>}
               </div>
               
               {!isTabSelectionMode ? (
@@ -939,9 +976,9 @@ export default function App() {
                 <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
                   <Button 
                     className="w-full py-5 text-lg justify-center bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20" 
-                    onClick={() => { processSale(selectedProd.id, currentUser, true); setSelectedProd(null); }}
+                    onClick={() => { processSale(selectedProd.id, currentUser, true, undefined, quantity); setSelectedProd(null); }}
                   >
-                    <Wallet className="w-6 h-6" /> Incassa Subito
+                    <Wallet className="w-6 h-6" /> Incassa {formatCurrency(selectedProd.sellPrice * quantity)}
                   </Button>
 
                   <div className="relative py-2">
@@ -963,14 +1000,14 @@ export default function App() {
                     <button onClick={() => setIsTabSelectionMode(false)} className="p-1 hover:bg-brand-light/10 rounded-full text-brand-muted hover:text-brand-light transition-colors">
                       <X className="w-5 h-5" /> 
                     </button>
-                    <span className="text-sm font-bold text-brand-muted uppercase">Chi segna il bollo?</span>
+                    <span className="text-sm font-bold text-brand-muted uppercase">Chi segna {quantity}x ?</span>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
                      {INITIAL_USERS.map(u => (
                        <button
                           key={u.id}
-                          onClick={() => { processSale(selectedProd.id, u.id, false); setSelectedProd(null); }}
+                          onClick={() => { processSale(selectedProd.id, u.id, false, undefined, quantity); setSelectedProd(null); }}
                           className="p-3 text-xs font-bold bg-brand-input rounded-lg border border-brand-light/10 hover:border-brand-light text-brand-light hover:bg-brand-light/10 transition-all truncate shadow-sm"
                        >
                          {u.name}
@@ -992,7 +1029,7 @@ export default function App() {
                         variant="secondary"
                         disabled={!guestNameInput.trim()}
                         onClick={() => {
-                           processSale(selectedProd.id, 'guest_custom', false, guestNameInput); 
+                           processSale(selectedProd.id, 'guest_custom', false, guestNameInput, quantity); 
                            setSelectedProd(null); 
                         }}
                       >
