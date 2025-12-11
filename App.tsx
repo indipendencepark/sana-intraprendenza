@@ -884,10 +884,21 @@ export default function App() {
     );
   };
 
-  // 2. POS / Vendita
+// 2. POS / Vendita
   const POSView = () => {
     const [selectedProd, setSelectedProd] = useState<Product | null>(null);
     const [guestNameInput, setGuestNameInput] = useState('');
+    
+    // NUOVO STATO: Gestisce se siamo nella fase di scelta "chi paga"
+    const [isTabSelectionMode, setIsTabSelectionMode] = useState(false);
+
+    // Resetta la modalità quando si chiude o si cambia prodotto
+    useEffect(() => {
+      if (!selectedProd) {
+        setIsTabSelectionMode(false);
+        setGuestNameInput('');
+      }
+    }, [selectedProd]);
 
     return (
       <div className="space-y-4 pb-24">
@@ -896,7 +907,7 @@ export default function App() {
           {data.products.map(p => (
             <button
               key={p.id}
-              onClick={() => { setSelectedProd(p); setGuestNameInput(''); }}
+              onClick={() => { setSelectedProd(p); }}
               disabled={p.stock <= 0}
               className={`p-4 rounded-xl border flex flex-col items-start justify-between h-32 transition-all ${
                 p.stock <= 0 
@@ -917,74 +928,86 @@ export default function App() {
         {selectedProd && (
           <div className="fixed inset-0 bg-brand-dark/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
             <div className="bg-brand-card w-full max-w-sm rounded-2xl border border-brand-light/20 p-6 shadow-2xl mt-10 mb-10">
-              <h3 className="text-xl font-bold mb-1 text-brand-light">{selectedProd.name}</h3>
-              <p className="text-brand-muted mb-6">{formatCurrency(selectedProd.sellPrice)}</p>
               
-              <div className="space-y-4">
-                <Button 
-                  className="w-full py-4 text-lg justify-center bg-emerald-600 hover:bg-emerald-500 text-white" 
-                  onClick={() => { processSale(selectedProd.id, currentUser, true); setSelectedProd(null); }}
-                >
-                  <Wallet className="w-5 h-5" /> Incassa Subito
-                </Button>
-                
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                    <div className="w-full border-t border-brand-light/10"></div>
-                  </div>
-                  <div className="relative flex justify-center">
-                    <span className="px-2 bg-brand-card text-sm text-brand-muted">SOCI</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                   {INITIAL_USERS.map(u => (
-                     <button
-                        key={u.id}
-                        onClick={() => { processSale(selectedProd.id, u.id, false); setSelectedProd(null); }}
-                        className="p-2 text-xs font-bold bg-brand-input rounded border border-brand-light/10 hover:border-brand-light text-brand-light transition-colors truncate"
-                     >
-                       {u.name}
-                     </button>
-                   ))}
-                </div>
-
-                <div className="relative mt-4">
-                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                    <div className="w-full border-t border-brand-light/10"></div>
-                  </div>
-                  <div className="relative flex justify-center">
-                    <span className="px-2 bg-brand-card text-sm text-brand-muted">OSPITE</span>
-                  </div>
-                </div>
-
-                <div className="bg-brand-input p-3 rounded-lg border border-brand-light/10">
-                  <input 
-                    type="text"
-                    placeholder="Nome ospite (es. Mario)"
-                    className="w-full bg-brand-dark border border-brand-light/10 rounded p-2 text-brand-light mb-2 focus:border-brand-light outline-none uppercase placeholder:text-brand-muted/50"
-                    value={guestNameInput}
-                    onChange={(e) => setGuestNameInput(e.target.value)}
-                  />
+              <div className="text-center mb-6">
+                 <h3 className="text-2xl font-bold mb-1 text-brand-light">{selectedProd.name}</h3>
+                 <p className="text-brand-muted text-lg">{formatCurrency(selectedProd.sellPrice)}</p>
+              </div>
+              
+              {!isTabSelectionMode ? (
+                // --- FASE 1: SCELTA TIPO PAGAMENTO ---
+                <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
                   <Button 
-                    variant="secondary"
-                    className="w-full text-sm py-2"
-                    disabled={!guestNameInput.trim()}
-                    onClick={() => {
-                       processSale(selectedProd.id, 'guest_custom', false, guestNameInput); 
-                       setSelectedProd(null); 
-                    }}
+                    className="w-full py-5 text-lg justify-center bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20" 
+                    onClick={() => { processSale(selectedProd.id, currentUser, true); setSelectedProd(null); }}
                   >
-                    Segna a {guestNameInput || '...'}
+                    <Wallet className="w-6 h-6" /> Incassa Subito
+                  </Button>
+
+                  <div className="relative py-2">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-brand-light/10"></div></div>
+                    <div className="relative flex justify-center"><span className="px-2 bg-brand-card text-xs text-brand-muted">OPPURE</span></div>
+                  </div>
+
+                  <Button 
+                    className="w-full py-5 text-lg justify-center bg-brand-light text-brand-dark hover:bg-white" 
+                    onClick={() => setIsTabSelectionMode(true)}
+                  >
+                    <Users className="w-6 h-6" /> Segna Bollo
                   </Button>
                 </div>
-              </div>
+              ) : (
+                // --- FASE 2: SELEZIONE CHI METTE IL BOLLO ---
+                <div className="space-y-4 animate-in slide-in-from-right-4 duration-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <button onClick={() => setIsTabSelectionMode(false)} className="p-1 hover:bg-brand-light/10 rounded-full text-brand-muted hover:text-brand-light transition-colors">
+                      <X className="w-5 h-5" /> 
+                    </button>
+                    <span className="text-sm font-bold text-brand-muted uppercase">Chi segna il bollo?</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                     {INITIAL_USERS.map(u => (
+                       <button
+                          key={u.id}
+                          onClick={() => { processSale(selectedProd.id, u.id, false); setSelectedProd(null); }}
+                          className="p-3 text-xs font-bold bg-brand-input rounded-lg border border-brand-light/10 hover:border-brand-light text-brand-light hover:bg-brand-light/10 transition-all truncate shadow-sm"
+                       >
+                         {u.name}
+                       </button>
+                     ))}
+                  </div>
+
+                  <div className="bg-brand-input p-3 rounded-lg border border-brand-light/10 mt-4">
+                    <label className="text-xs text-brand-muted font-bold ml-1 mb-2 block uppercase">Ospite Esterno</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text"
+                        placeholder="Nome (es. Mario)"
+                        className="w-full bg-brand-dark border border-brand-light/10 rounded p-2 text-brand-light focus:border-brand-light outline-none uppercase placeholder:text-brand-muted/50"
+                        value={guestNameInput}
+                        onChange={(e) => setGuestNameInput(e.target.value)}
+                      />
+                      <Button 
+                        variant="secondary"
+                        disabled={!guestNameInput.trim()}
+                        onClick={() => {
+                           processSale(selectedProd.id, 'guest_custom', false, guestNameInput); 
+                           setSelectedProd(null); 
+                        }}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <button 
                 onClick={() => setSelectedProd(null)}
-                className="mt-6 w-full py-3 text-brand-muted hover:text-brand-light border-t border-brand-light/10"
+                className="mt-8 w-full py-3 text-brand-muted hover:text-red-400 border-t border-brand-light/10 text-sm transition-colors"
               >
-                Annulla
+                Annulla Vendita
               </button>
             </div>
           </div>
