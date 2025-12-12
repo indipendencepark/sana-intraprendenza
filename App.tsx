@@ -444,7 +444,7 @@ export default function App() {
   const [firebaseAuth, setFirebaseAuth] = useState<Auth | null>(null);
   
   // Data State
-  const [data, setData] = useState<AppDataState>({
+  const DEFAULT_STATE: AppDataState = {
     products: INITIAL_PRODUCTS,
     tabs: [],
     cashRegister: { currentBalance: INITIAL_CASH_START, lastVerifiedDate: Date.now() },
@@ -452,7 +452,21 @@ export default function App() {
     cumulativeSales: 0,
     cumulativeExpenses: 0,
     lastAuditDiscrepancy: 0
+  };
+
+  const withDefaults = (incoming?: Partial<AppDataState>): AppDataState => ({
+    ...DEFAULT_STATE,
+    ...incoming,
+    products: incoming?.products ?? DEFAULT_STATE.products,
+    tabs: incoming?.tabs ?? DEFAULT_STATE.tabs,
+    cashRegister: incoming?.cashRegister ?? DEFAULT_STATE.cashRegister,
+    logs: incoming?.logs ?? [],
+    cumulativeSales: incoming?.cumulativeSales ?? 0,
+    cumulativeExpenses: incoming?.cumulativeExpenses ?? 0,
+    lastAuditDiscrepancy: incoming?.lastAuditDiscrepancy ?? 0
   });
+
+  const [data, setData] = useState<AppDataState>(DEFAULT_STATE);
 
   // Check session on load
   useEffect(() => {
@@ -500,7 +514,7 @@ export default function App() {
 
       const unsub = onSnapshot(doc(dbInstance, "bar_app", "main_state"), (docSnapshot) => {
         if (docSnapshot.exists()) {
-          setData(docSnapshot.data() as AppDataState);
+          setData(withDefaults(docSnapshot.data() as Partial<AppDataState>));
         } else {
           setDoc(doc(dbInstance, "bar_app", "main_state"), data);
         }
@@ -615,7 +629,8 @@ export default function App() {
       meta: options.meta,
       locked: options.locked
     };
-    return { ...newData, logs: [newLog, ...newData.logs] };
+    const existingLogs = Array.isArray(newData.logs) ? newData.logs : [];
+    return { ...newData, logs: [newLog, ...existingLogs] };
   };
 
 const processSale = (productId: string, targetUserId: string, isCash: boolean, guestName?: string, qty: number = 1) => {
