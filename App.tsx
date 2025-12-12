@@ -1471,19 +1471,23 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
                 className="w-full bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
               />
 
-              <input
-                type="date"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                className="w-full bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
-              />
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  placeholder="dal giorno"
+                  className="flex-1 min-w-[160px] bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
+                />
 
-              <input
-                type="date"
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-                className="w-full bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
-              />
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  placeholder="al giorno"
+                  className="flex-1 min-w-[160px] bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
+                />
+              </div>
             </div>
           )}
         </div>
