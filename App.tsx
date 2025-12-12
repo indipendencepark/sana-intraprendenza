@@ -972,15 +972,9 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
         <header className="flex justify-between items-center">
           <h2 className="text-2xl font-bold text-brand-light">Dashboard</h2>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setIsCloudConfigOpen(true)} className={`text-sm px-2 ${firebaseDb ? 'text-emerald-400 border-emerald-500/30' : 'text-brand-muted'}`}>
-              {firebaseDb ? <Cloud className="w-4 h-4" /> : <CloudOff className="w-4 h-4" />}
               <Button variant="secondary" onClick={() => setActiveTab('logs')} className="text-sm px-2">
                 <History className="w-4 h-4" />
               </Button>
-            </Button>
-            <Button variant="secondary" onClick={runAiAnalysis} disabled={isAiLoading} className="text-sm px-2">
-              {isAiLoading ? <Sparkles className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-brand-light" />}
-            </Button>
           </div>
         </header>
 
