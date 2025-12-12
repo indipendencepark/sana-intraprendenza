@@ -620,7 +620,7 @@ const addLog = (
   ) => {
     const user = INITIAL_USERS.find(u => u.id === currentUser)?.name || 'Sconosciuto';
     
-    // CORREZIONE: Creiamo l'oggetto evitando valori 'undefined' che bloccano Firestore
+    // Creiamo l'oggetto base SENZA proprietà opzionali
     const newLog: LogEntry = {
       id: crypto.randomUUID(),
       timestamp: Date.now(),
@@ -630,12 +630,13 @@ const addLog = (
       value,
     };
 
-    // Aggiungi meta solo se esiste
+    // Aggiungiamo meta SOLO se esiste
     if (options.meta) {
       newLog.meta = options.meta;
     }
 
-    // Aggiungi locked solo se è definito (true o false)
+    // FIX IMPORTANTE: Aggiungiamo locked SOLO se è vero o falso (non undefined)
+    // Questo è ciò che impediva il salvataggio delle vendite e dei bolli!
     if (options.locked !== undefined) {
       newLog.locked = options.locked;
     }
