@@ -94,7 +94,8 @@ enum TransactionType {
   EXPENSE = 'SPESA_EXTRA',
   CASH_COUNT = 'CONTEGGIO_CASSA',
   TAB_PAYMENT = 'PAGAMENTO_BOLLO',
-  INVENTORY_ADJUSTMENT = 'RETTIFICA_INVENTARIO'
+  INVENTORY_ADJUSTMENT = 'RETTIFICA_INVENTARIO',
+  LOG_MODIFICATION = 'LOG_MODIFICATION'
 }
 
 interface LogEntry {
@@ -104,6 +105,8 @@ interface LogEntry {
   type: TransactionType;
   description: string;
   value: number; // Valore monetario positivo o negativo
+  meta?: Record<string, any>;
+  locked?: boolean;
 }
 
 interface CashState {
@@ -591,7 +594,13 @@ export default function App() {
 
   // --- Actions ---
 
-  const addLog = (newData: AppDataState, type: TransactionType, description: string, value: number) => {
+  const addLog = (
+    newData: AppDataState,
+    type: TransactionType,
+    description: string,
+    value: number,
+    options: { meta?: Record<string, any>, locked?: boolean } = {}
+  ) => {
     const user = INITIAL_USERS.find(u => u.id === currentUser)?.name || 'Sconosciuto';
     const newLog: LogEntry = {
       id: crypto.randomUUID(),
@@ -599,7 +608,9 @@ export default function App() {
       user,
       type,
       description,
-      value
+      value,
+      meta: options.meta,
+      locked: options.locked
     };
     return { ...newData, logs: [newLog, ...newData.logs] };
   };
@@ -628,7 +639,13 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
     if (isCash) {
       // Cash Sale
       newState.cashRegister = { ...newState.cashRegister, currentBalance: newState.cashRegister.currentBalance + totalValue };
-      newState = addLog(newState, TransactionType.SALE_CASH, `Vendita Cassa: ${logName}`, totalValue);
+      newState = addLog(
+        newState,
+        TransactionType.SALE_CASH,
+        `Vendita Cassa: ${logName}`,
+        totalValue,
+        { meta: { productId: product.id, qty, amount: totalValue, mode: 'cash' } }
+      );
     } else {
       // Tab Sale
       let finalUserId = targetUserId;
@@ -664,7 +681,13 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
           totalOwed: totalValue
         }];
       }
-      newState = addLog(newState, TransactionType.SALE_TAB, `Bollo ${finalUserName}: ${logName}`, totalValue);
+      newState = addLog(
+        newState,
+        TransactionType.SALE_TAB,
+        `Bollo ${finalUserName}: ${logName}`,
+        totalValue,
+        { meta: { productId: product.id, qty, tabUserId: finalUserId, tabItemId: newItem.id, amount: totalValue, userName: finalUserName } }
+      );
     }
 
     saveData(newState);
@@ -684,7 +707,13 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
     }).filter(t => t.totalOwed > 0.01);
 
     newState.cashRegister = { ...newState.cashRegister, currentBalance: newState.cashRegister.currentBalance + amount };
-    newState = addLog(newState, TransactionType.TAB_PAYMENT, `Pagamento Bollo: ${userName}`, amount);
+    newState = addLog(
+      newState,
+      TransactionType.TAB_PAYMENT,
+      `Pagamento Bollo: ${userName}`,
+      amount,
+      { meta: { userId, amount, userName } }
+    );
     
     saveData(newState);
   };
@@ -693,7 +722,13 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
     let newState = { ...data };
     newState.cashRegister = { ...newState.cashRegister, currentBalance: newState.cashRegister.currentBalance - amount };
     newState.cumulativeExpenses += amount;
-    newState = addLog(newState, TransactionType.EXPENSE, `Spesa: ${reason}`, -amount);
+    newState = addLog(
+      newState,
+      TransactionType.EXPENSE,
+      `Spesa: ${reason}`,
+      -amount,
+      { meta: { amount } }
+    );
     saveData(newState);
   };
 
@@ -712,14 +747,28 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
            costDifference = stockDiff * p.costPrice;
         }
         newState.products = newState.products.map(prod => prod.id === existingId ? { ...p, id: existingId } : prod);
-        newState = addLog(newState, TransactionType.RESTOCK, `Modifica/Restock: ${p.name}`, stockDiff > 0 ? -costDifference : 0);
+        if (stockDiff > 0) {
+          newState = addLog(
+            newState,
+            TransactionType.RESTOCK,
+            `Modifica/Restock: ${p.name}`,
+            -costDifference,
+            { meta: { productId: existingId, stockAdded: stockDiff, costImpact: costDifference, isNewProduct: false } }
+          );
+        }
       }
     } else {
       // Creating New
       const newProduct = { ...p, id: crypto.randomUUID() };
       newState.products = [...newState.products, newProduct];
       costDifference = p.stock * p.costPrice;
-      newState = addLog(newState, TransactionType.RESTOCK, `Nuovo Prodotto: ${p.name}`, -costDifference);
+      newState = addLog(
+        newState,
+        TransactionType.RESTOCK,
+        `Nuovo Prodotto: ${p.name}`,
+        -costDifference,
+        { meta: { productId: newProduct.id, stockAdded: p.stock, costImpact: costDifference, isNewProduct: true } }
+      );
     }
 
     if (costDifference > 0) {
@@ -737,7 +786,13 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
       if(window.confirm(`Sei SICURO di voler eliminare l'articolo "${p.name}" dal database?\nQuesta azione è irreversibile.`)) {
         let newState = { ...data };
         newState.products = newState.products.filter(prod => prod.id !== id);
-        newState = addLog(newState, TransactionType.INVENTORY_ADJUSTMENT, `Eliminato Articolo: ${p.name}`, 0);
+        newState = addLog(
+          newState,
+          TransactionType.INVENTORY_ADJUSTMENT,
+          `Eliminato Articolo: ${p.name}`,
+          0,
+          { meta: { removedProduct: p } }
+        );
         saveData(newState);
       }
     }
@@ -767,7 +822,13 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
     // 2. Apply Presumed Revenue
     if (presumedSalesRevenue > 0) {
       newState.cumulativeSales += presumedSalesRevenue;
-      newState = addLog(newState, TransactionType.SALE_CASH, `Vendite Presunte da Conteggio: ${productsUpdatedLog.join(', ')}`, presumedSalesRevenue);
+      newState = addLog(
+        newState,
+        TransactionType.SALE_CASH,
+        `Vendite Presunte da Conteggio: ${productsUpdatedLog.join(', ')}`,
+        presumedSalesRevenue,
+        { meta: { source: 'audit', productsUpdatedLog }, locked: true }
+      );
     }
 
     // 3. Reconcile Cash
@@ -787,15 +848,117 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
 
     newState = addLog(
       newState,
-      TransactionType.CASH_COUNT, 
-      `Conteggio Cassa: ${formatCurrency(countedCash)}. Discrepanza gestione rilevata: ${formatCurrency(newDiscrepancy)}`, 
-      newDiscrepancy
+      TransactionType.CASH_COUNT,
+      `Conteggio Cassa: ${formatCurrency(countedCash)}. Discrepanza gestione rilevata: ${formatCurrency(newDiscrepancy)}`,
+      newDiscrepancy,
+      { meta: { countedCash, discrepancy: newDiscrepancy }, locked: true }
     );
 
     saveData(newState);
     alert(`Conteggio completato!\n\nVendite recuperate da magazzino: ${formatCurrency(presumedSalesRevenue)}\n\nDiscrepanza Aggiornata: ${formatCurrency(newDiscrepancy)}`);
   };
 
+    const reverseLogEffects = (log: LogEntry, baseState: AppDataState) => {
+    const meta = log.meta || {};
+    let newState = { ...baseState };
+
+    switch (log.type) {
+      case TransactionType.SALE_CASH: {
+        const { productId, qty, amount } = meta;
+        if (!productId || !qty || amount === undefined) throw new Error('Dati vendita cassa mancanti.');
+        newState.products = newState.products.map(p => p.id === productId ? { ...p, stock: p.stock + qty } : p);
+        newState.cashRegister = { ...newState.cashRegister, currentBalance: newState.cashRegister.currentBalance - amount };
+        newState.cumulativeSales = Math.max(0, newState.cumulativeSales - amount);
+        return newState;
+      }
+      case TransactionType.SALE_TAB: {
+        const { productId, qty, tabUserId, tabItemId, amount } = meta;
+        if (!productId || !qty || !tabUserId || !tabItemId || amount === undefined) throw new Error('Dati bollo incompleti.');
+        newState.products = newState.products.map(p => p.id === productId ? { ...p, stock: p.stock + qty } : p);
+        newState.cumulativeSales = Math.max(0, newState.cumulativeSales - amount);
+        newState.tabs = newState.tabs
+          .map(t => {
+            if (t.userId !== tabUserId) return t;
+            const items = t.items.filter(i => i.id !== tabItemId);
+            const removedItem = t.items.find(i => i.id === tabItemId);
+            const refunded = removedItem?.price ?? amount;
+            const totalOwed = Math.max(0, t.totalOwed - refunded);
+            return { ...t, items, totalOwed };
+          })
+          .filter(t => t.totalOwed > 0.01 || t.items.length > 0 || t.userId !== tabUserId);
+        return newState;
+      }
+      case TransactionType.TAB_PAYMENT: {
+        const { userId, amount, userName } = meta;
+        if (!userId || amount === undefined) throw new Error('Dati pagamento bollo mancanti.');
+        const targetName = userName || INITIAL_USERS.find(u => u.id === userId)?.name || 'Utente';
+        const existing = newState.tabs.find(t => t.userId === userId);
+        if (existing) {
+          newState.tabs = newState.tabs.map(t => t.userId === userId ? { ...t, totalOwed: t.totalOwed + amount } : t);
+        } else {
+          newState.tabs = [...newState.tabs, { userId, userName: targetName, items: [], totalOwed: amount }];
+        }
+        newState.cashRegister = { ...newState.cashRegister, currentBalance: newState.cashRegister.currentBalance - amount };
+        return newState;
+      }
+      case TransactionType.EXPENSE: {
+        const { amount } = meta;
+        if (amount === undefined) throw new Error('Importo spesa mancante.');
+        newState.cashRegister = { ...newState.cashRegister, currentBalance: newState.cashRegister.currentBalance + amount };
+        newState.cumulativeExpenses = Math.max(0, newState.cumulativeExpenses - amount);
+        return newState;
+      }
+      case TransactionType.RESTOCK: {
+        const { productId, stockAdded, costImpact, isNewProduct } = meta;
+        if (!productId || stockAdded === undefined || costImpact === undefined) throw new Error('Dati restock mancanti.');
+        if (isNewProduct) {
+          newState.products = newState.products.filter(p => p.id !== productId);
+        } else {
+          newState.products = newState.products.map(p => p.id === productId ? { ...p, stock: Math.max(0, p.stock - stockAdded) } : p);
+        }
+        newState.cashRegister = { ...newState.cashRegister, currentBalance: newState.cashRegister.currentBalance + costImpact };
+        newState.cumulativeExpenses = Math.max(0, newState.cumulativeExpenses - costImpact);
+        return newState;
+      }
+      case TransactionType.INVENTORY_ADJUSTMENT: {
+        const { removedProduct } = meta;
+        if (removedProduct) {
+          const exists = newState.products.some(p => p.id === removedProduct.id);
+          if (!exists) newState.products = [...newState.products, removedProduct];
+        }
+        return newState;
+      }
+      default:
+        throw new Error('Questa voce di log non è reversibile.');
+    }
+  };
+
+  const handleLogDeletion = (logId: string) => {
+    const log = data.logs.find(l => l.id === logId);
+    if (!log) return;
+    if (log.locked) {
+      alert('Questa voce è protetta e non può essere eliminata.');
+      return;
+    }
+
+    if (!window.confirm('Eliminare questa azione e annullarne gli effetti?')) return;
+
+    try {
+      let newState = reverseLogEffects(log, { ...data });
+      newState.logs = newState.logs.filter(l => l.id !== logId);
+      newState = addLog(
+        newState,
+        TransactionType.LOG_MODIFICATION,
+        `Azione annullata: ${log.description}`,
+        0,
+        { meta: { deletedLogId: log.id, originalType: log.type, originalDescription: log.description }, locked: true }
+      );
+      saveData(newState);
+    } catch (error) {
+      alert((error as Error).message);
+    }
+  };
+  
   // --- Views ---
 
   // 1. Dashboard
@@ -811,6 +974,9 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setIsCloudConfigOpen(true)} className={`text-sm px-2 ${firebaseDb ? 'text-emerald-400 border-emerald-500/30' : 'text-brand-muted'}`}>
               {firebaseDb ? <Cloud className="w-4 h-4" /> : <CloudOff className="w-4 h-4" />}
+              <Button variant="secondary" onClick={() => setActiveTab('logs')} className="text-sm px-2">
+                <History className="w-4 h-4" />
+              </Button>
             </Button>
             <Button variant="secondary" onClick={runAiAnalysis} disabled={isAiLoading} className="text-sm px-2">
               {isAiLoading ? <Sparkles className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-brand-light" />}
@@ -1245,36 +1411,118 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
   };
 
   // 6. Logs
-  const LogsView = () => (
-    <div className="space-y-4 pb-24">
-      <h2 className="text-2xl font-bold text-brand-light mb-4">Registro Attività</h2>
-      <div className="space-y-4">
-        {data.logs.map(log => (
-          <div key={log.id} className="flex gap-4 border-b border-brand-light/10 pb-3 last:border-0">
-            <div className={`w-2 h-full rounded-full self-stretch ${
-              log.type === TransactionType.SALE_CASH ? 'bg-emerald-500' :
-              log.type === TransactionType.EXPENSE || log.type === TransactionType.RESTOCK ? 'bg-red-500' :
-              log.type === TransactionType.SALE_TAB ? 'bg-orange-500' :
-              log.type === TransactionType.TAB_PAYMENT ? 'bg-indigo-500' :
-              'bg-brand-muted'
-            }`}></div>
-            <div className="flex-1">
-              <div className="flex justify-between">
-                <span className="font-bold text-brand-light text-sm">{log.description}</span>
-                <span className={`text-sm font-mono ${log.value >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {log.value !== 0 ? formatCurrency(log.value) : '-'}
-                </span>
-              </div>
-              <div className="flex justify-between mt-1 text-xs text-brand-muted">
-                <span>{new Date(log.timestamp).toLocaleString()}</span>
-                <span>Utente: {log.user}</span>
+    const LogsView = () => {
+    const [typeFilter, setTypeFilter] = useState<TransactionType | 'ALL'>('ALL');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+
+    const filteredLogs = useMemo(() => {
+      return data.logs.filter(log => {
+        if (typeFilter !== 'ALL' && log.type !== typeFilter) return false;
+        if (searchTerm && !log.description.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+        if (startDate && log.timestamp < new Date(startDate).setHours(0, 0, 0, 0)) return false;
+        if (endDate && log.timestamp > new Date(endDate).setHours(23, 59, 59, 999)) return false;
+        return true;
+      });
+    }, [data.logs, typeFilter, searchTerm, startDate, endDate]);
+
+    const typeOptions = [
+      { value: 'ALL', label: 'Tutti' },
+      { value: TransactionType.SALE_CASH, label: 'Vendite cassa' },
+      { value: TransactionType.SALE_TAB, label: 'Vendite bollo' },
+      { value: TransactionType.TAB_PAYMENT, label: 'Pagamenti bollo' },
+      { value: TransactionType.RESTOCK, label: 'Restock / Prodotti' },
+      { value: TransactionType.EXPENSE, label: 'Spese' },
+      { value: TransactionType.CASH_COUNT, label: 'Conteggi cassa' },
+      { value: TransactionType.INVENTORY_ADJUSTMENT, label: 'Rettifiche inventario' },
+      { value: TransactionType.LOG_MODIFICATION, label: 'Revisioni log' }
+    ];
+
+    return (
+      <div className="space-y-4 pb-24">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="text-2xl font-bold text-brand-light">Registro Attività</h2>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <select
+              value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value as TransactionType | 'ALL')}
+              className="bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2 flex-1"
+            >
+              {typeOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder="Cerca descrizione"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2 flex-1"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 w-full">
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
+            />
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {filteredLogs.length === 0 && (
+            <div className="text-center text-brand-muted text-sm py-8 border border-dashed border-brand-light/10 rounded-lg">
+              Nessun log corrisponde ai filtri selezionati.
+            </div>
+          )}
+          {filteredLogs.map(log => (
+            <div key={log.id} className="flex gap-4 border-b border-brand-light/10 pb-3 last:border-0">
+              <div className={`w-2 h-full rounded-full self-stretch ${
+                log.type === TransactionType.SALE_CASH ? 'bg-emerald-500' :
+                log.type === TransactionType.EXPENSE || log.type === TransactionType.RESTOCK ? 'bg-red-500' :
+                log.type === TransactionType.SALE_TAB ? 'bg-orange-500' :
+                log.type === TransactionType.TAB_PAYMENT ? 'bg-indigo-500' :
+                log.type === TransactionType.LOG_MODIFICATION ? 'bg-amber-400' :
+                'bg-brand-muted'
+              }`}></div>
+              <div className="flex-1">
+                <div className="flex justify-between gap-2">
+                  <span className="font-bold text-brand-light text-sm">{log.description}</span>
+                  <span className={`text-sm font-mono ${log.value >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {log.value !== 0 ? formatCurrency(log.value) : '-'}
+                  </span>
+                </div>
+                <div className="text-xs text-brand-muted mt-1 flex items-center gap-2">
+                  <span>{new Date(log.timestamp).toLocaleString()}</span>
+                  <span>· {log.user}</span>
+                  {log.locked && (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-amber-300"><Lock className="w-3 h-3" /> Protetto</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-brand-muted uppercase mt-1 font-bold">{log.type.replace('_', ' ')}</div>
+                {!log.locked && (
+                  <button
+                    className="text-xs text-red-400 hover:text-red-300 mt-2 flex items-center gap-1"
+                    onClick={() => handleLogDeletion(log.id)}
+                  >
+                    <Trash2 className="w-4 h-4" /> Annulla azione
+                  </button>
+                )}
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // --- Auth Check ---
   if (!isAuthenticated) {
@@ -1332,7 +1580,6 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
         <NavButton icon={<Beer />} label="Magazzino" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} />
         <NavButton icon={<Users />} label="Bolli" active={activeTab === 'tabs'} onClick={() => setActiveTab('tabs')} />
         <NavButton icon={<Wallet />} label="Cassa" active={activeTab === 'cash'} onClick={() => setActiveTab('cash')} />
-        <NavButton icon={<History />} label="Logs" active={activeTab === 'logs'} onClick={() => setActiveTab('logs')} />
       </div>
 
       {isCloudConfigOpen && (
