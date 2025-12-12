@@ -480,8 +480,8 @@ export default function App() {
   // Initialize Data Source (CLOUD ONLY)
   useEffect(() => {
     const savedConfig = localStorage.getItem('bar_firebase_config');
-    const envConfig = {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+const envConfig = {
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY, // Assicurati che ci sia VITE_
       authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
       projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
       storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
