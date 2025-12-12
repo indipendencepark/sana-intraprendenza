@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { 
-  LayoutDashboard, 
-  Beer, 
-  Users, 
+import {
+  LayoutDashboard,
+  Beer,
+  Users,
   Wallet, 
   History, 
   Plus, 
@@ -25,23 +25,7 @@ import {
 import { GoogleGenAI } from "@google/genai";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc, collection, query, where, getDocs, Firestore } from "firebase/firestore";
-import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-
-// --- CONFIGURAZIONE FISSA (Spostata fuori) ---
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAj5Ya9w0YTHCU0ZGexD1SVcjlSPTVe5Uo",
-  authDomain: "sana-intraprendenza.firebaseapp.com",
-  projectId: "sana-intraprendenza",
-  storageBucket: "sana-intraprendenza.firebasestorage.app",
-  messagingSenderId: "1087913630556",
-  appId: "1:1087913630556:web:e4969c289f94023f98bf99",
-  measurementId: "G-ZVSB4JDVBC"
-};
-
-// Inizializza Firebase globalmente
-const app = initializeApp(FIREBASE_CONFIG);
-const db = getFirestore(app);
-const auth = getAuth(app); // Attiva Auth
+import { Auth, getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 
 // --- Types ---
 
@@ -181,7 +165,7 @@ const formatCurrency = (val: number) => new Intl.NumberFormat('it-IT', { style: 
 
 // --- Auth Component ---
 
-const AuthScreen = ({ onLogin, db, onOpenCloudConfig }: { onLogin: (userId: string) => void, db: Firestore | null, onOpenCloudConfig: () => void }) => {
+const AuthScreen = ({ onLogin, db, auth, onOpenCloudConfig }: { onLogin: (userId: string) => void, db: Firestore | null, auth?: Auth | null, onOpenCloudConfig: () => void }) => {
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -269,6 +253,10 @@ const AuthScreen = ({ onLogin, db, onOpenCloudConfig }: { onLogin: (userId: stri
 
   const handleGoogleLogin = async () => {
     try {
+      if (!auth || !db) {
+        setError('Login Google disponibile solo con il cloud configurato.');
+        return;
+      }
       setLoading(true);
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
@@ -453,6 +441,7 @@ export default function App() {
   // Cloud State
   const [isCloudConfigOpen, setIsCloudConfigOpen] = useState(false);
   const [firebaseDb, setFirebaseDb] = useState<Firestore | null>(null);
+  const [firebaseAuth, setFirebaseAuth] = useState<Auth | null>(null);
   
   // Data State
   const [data, setData] = useState<AppDataState>({
@@ -474,33 +463,46 @@ export default function App() {
     }
   }, []);
 
-// --- HARDCODED CONFIGURATION ---
-  const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyAj5Ya9w0YTHCU0ZGexD1SVcjlSPTVe5Uo",
-    authDomain: "sana-intraprendenza.firebaseapp.com",
-    projectId: "sana-intraprendenza",
-    storageBucket: "sana-intraprendenza.firebasestorage.app",
-    messagingSenderId: "1087913630556",
-    appId: "1:1087913630556:web:e4969c289f94023f98bf99",
-    measurementId: "G-ZVSB4JDVBC"
-  };
-
   // Initialize Data Source (CLOUD ONLY)
   useEffect(() => {
-    try {
-      // Inizializza direttamente con la configurazione fissa
-      const app = initializeApp(FIREBASE_CONFIG);
-      const db = getFirestore(app);
-      setFirebaseDb(db); 
+    const savedConfig = localStorage.getItem('bar_firebase_config');
+    const envConfig = {
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+      appId: import.meta.env.VITE_FIREBASE_APP_ID,
+      measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+    };
 
-      // Subscribe to real-time updates for APP DATA
-      const unsub = onSnapshot(doc(db, "bar_app", "main_state"), (docSnapshot) => {
+    let parsedConfig = envConfig;
+    if (savedConfig) {
+      try {
+        parsedConfig = JSON.parse(savedConfig);
+      } catch (error) {
+        console.warn('Configurazione cloud non valida, uso variabili ambiente.', error);
+      }
+    }
+    const requiredKeys: (keyof typeof parsedConfig)[] = ['apiKey', 'projectId'];
+    const hasRequiredConfig = requiredKeys.every((key) => parsedConfig?.[key]);
+
+    if (!hasRequiredConfig) {
+      console.info('Firebase non configurato: avvio in modalità locale.');
+      return;
+    }
+
+    try {
+      const appInstance = initializeApp(parsedConfig);
+      const dbInstance = getFirestore(appInstance);
+      setFirebaseDb(dbInstance);
+      setFirebaseAuth(getAuth(appInstance));
+
+      const unsub = onSnapshot(doc(dbInstance, "bar_app", "main_state"), (docSnapshot) => {
         if (docSnapshot.exists()) {
           setData(docSnapshot.data() as AppDataState);
         } else {
-          // Se è la prima volta in assoluto e il DB è vuoto, crea il documento
-          // (Usa setDoc importato da firestore)
-          setDoc(doc(db, "bar_app", "main_state"), data); 
+          setDoc(doc(dbInstance, "bar_app", "main_state"), data);
         }
       }, (error) => {
         console.error("Cloud Error:", error);
@@ -1543,9 +1545,10 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
   if (!isAuthenticated) {
     return (
       <>
-        <AuthScreen 
-          onLogin={handleLogin} 
-          db={firebaseDb} 
+        <AuthScreen
+          onLogin={handleLogin}
+          db={firebaseDb}
+          auth={firebaseAuth}
           onOpenCloudConfig={() => setIsCloudConfigOpen(true)}
         />
         {isCloudConfigOpen && (
