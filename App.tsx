@@ -479,18 +479,6 @@ export default function App() {
 
   // Initialize Data Source (CLOUD ONLY)
   useEffect(() => {
-    const saved = localStorage.getItem('bar_data_full');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setData(withDefaults(parsed));
-      } catch (error) {
-        console.warn('Salvataggio locale non valido, ripristino valori di default.', error);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
     const savedConfig = localStorage.getItem('bar_firebase_config');
     const envConfig = {
       apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
