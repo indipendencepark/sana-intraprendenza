@@ -1439,7 +1439,7 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
     return (
       <div className="space-y-4 pb-24">
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
+          <div style={{ marginLeft: '1rem' }} className="flex items-center justify-between gap-3">
             <h2 className="text-2xl font-bold text-brand-light">Registro Attività</h2>
             <Button
               variant="secondary"
@@ -1499,7 +1499,7 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
             </div>
           )}
           {filteredLogs.map(log => (
-            <div key={log.id} className="flex items-start gap-3 border-b border-brand-light/10 pb-3 last:border-0">
+            <div key={log.id} className="flex items-start border-b border-brand-light/10 pb-3 last:border-0">
               <div className={`w-2 h-full rounded-full self-stretch ${
                 log.type === TransactionType.SALE_CASH ? 'bg-emerald-500' :
                 log.type === TransactionType.EXPENSE || log.type === TransactionType.RESTOCK ? 'bg-red-500' :
