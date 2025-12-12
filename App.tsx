@@ -1439,7 +1439,7 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
     return (
       <div className="space-y-4 pb-24">
         <div className="space-y-3">
-          <div style={{ marginLeft: '0.25rem' }} className="flex items-center justify-between gap-3">
+          <div style={{ marginLeft: '0.40rem' }} className="flex items-center justify-between gap-3">
             <h2 className="text-2xl font-bold text-brand-light">Registro Attività</h2>
             <Button
               variant="secondary"
