@@ -478,55 +478,53 @@ export default function App() {
   }, []);
 
   // Initialize Data Source (CLOUD ONLY)
+// Initialize Data Source (HARDCODED PER FUNZIONARE SUBITO)
   useEffect(() => {
-    const savedConfig = localStorage.getItem('bar_firebase_config');
-const envConfig = {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY, // Assicurati che ci sia VITE_
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-      appId: import.meta.env.VITE_FIREBASE_APP_ID,
-      measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
-    };
+    // -----------------------------------------------------------
+    // INCOLLA I TUOI DATI FIREBASE QUI DENTRO AL POSTO DELLE SCRITTE TRA VIRGOLETTE
+    // -----------------------------------------------------------
 
-    let parsedConfig = envConfig;
-    if (savedConfig) {
-      try {
-        parsedConfig = JSON.parse(savedConfig);
-      } catch (error) {
-        console.warn('Configurazione cloud non valida, uso variabili ambiente.', error);
-      }
-    }
-    const requiredKeys: (keyof typeof parsedConfig)[] = ['apiKey', 'projectId'];
-    const hasRequiredConfig = requiredKeys.every((key) => parsedConfig?.[key]);
-
-    if (!hasRequiredConfig) {
-      console.info('Firebase non configurato: avvio in modalità locale.');
-      return;
-    }
+    const firebaseConfig = {
+  apiKey: "AIzaSyAj5Ya9w0YTHCUOZGexD1SVcjlSPTVe5Uo",
+  authDomain: "sana-intraprendenza.firebaseapp.com",
+  projectId: "sana-intraprendenza",
+  storageBucket: "sana-intraprendenza.firebasestorage.app",
+  messagingSenderId: "1087913630556",
+  appId: "1:1087913630556:web:e4969c289f94023f98bf99",
+  measurementId: "G-ZVSB4JDVBC"
+};
+    // -----------------------------------------------------------
 
     try {
-      const appInstance = initializeApp(parsedConfig);
+      // Inizializza Firebase direttamente con i dati qui sopra
+      const appInstance = initializeApp(firebaseConfig);
       const dbInstance = getFirestore(appInstance);
       setFirebaseDb(dbInstance);
       setFirebaseAuth(getAuth(appInstance));
 
+      console.log("Tentativo connessione Cloud...");
+
       const unsub = onSnapshot(doc(dbInstance, "bar_app", "main_state"), (docSnapshot) => {
         if (docSnapshot.exists()) {
+          console.log("Dati scaricati dal Cloud!");
           setData(withDefaults(docSnapshot.data() as Partial<AppDataState>));
         } else {
+          console.log("Nessun dato sul Cloud, creo init...");
           setDoc(doc(dbInstance, "bar_app", "main_state"), data);
         }
       }, (error) => {
         console.error("Cloud Error:", error);
-        alert("Errore connessione Cloud: " + error.message);
+        // Se il cloud fallisce, prova a caricare dal locale come backup
+        const savedLocal = localStorage.getItem('bar_data_full');
+        if(savedLocal) setData(withDefaults(JSON.parse(savedLocal)));
       });
 
       return () => unsub();
     } catch (e) {
       console.error("Firebase init failed", e);
-      alert("Impossibile connettersi al database.");
+      // Backup locale se configurazione errata
+      const savedLocal = localStorage.getItem('bar_data_full');
+      if(savedLocal) setData(withDefaults(JSON.parse(savedLocal)));
     }
   }, []);
 
@@ -620,7 +618,7 @@ const addLog = (
   ) => {
     const user = INITIAL_USERS.find(u => u.id === currentUser)?.name || 'Sconosciuto';
     
-    // Creiamo l'oggetto base SENZA proprietà opzionali
+    // CORREZIONE FONDAMENTALE PER IL DATABASE
     const newLog: LogEntry = {
       id: crypto.randomUUID(),
       timestamp: Date.now(),
@@ -630,13 +628,11 @@ const addLog = (
       value,
     };
 
-    // Aggiungiamo meta SOLO se esiste
     if (options.meta) {
       newLog.meta = options.meta;
     }
 
-    // FIX IMPORTANTE: Aggiungiamo locked SOLO se è vero o falso (non undefined)
-    // Questo è ciò che impediva il salvataggio delle vendite e dei bolli!
+    // QUESTO PREVIENE IL BLOCCO DEL DATABASE (Non passa undefined)
     if (options.locked !== undefined) {
       newLog.locked = options.locked;
     }
