@@ -1499,7 +1499,7 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
             </div>
           )}
           {filteredLogs.map(log => (
-            <div key={log.id} className="flex gap-4 border-b border-brand-light/10 pb-3 last:border-0">
+            <div key={log.id} className="flex items-start gap-3 border-b border-brand-light/10 pb-3 last:border-0">
               <div className={`w-2 h-full rounded-full self-stretch ${
                 log.type === TransactionType.SALE_CASH ? 'bg-emerald-500' :
                 log.type === TransactionType.EXPENSE || log.type === TransactionType.RESTOCK ? 'bg-red-500' :
@@ -1509,9 +1509,9 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
                 'bg-brand-muted'
               }`}></div>
               <div className="flex-1">
-                <div className="flex justify-between gap-2">
-                  <span className="font-bold text-brand-light text-sm">{log.description}</span>
-                  <span className={`text-sm font-mono ${log.value >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-bold text-brand-light text-sm flex-1 leading-snug text-left">{log.description}</span>
+                  <span className={`text-sm font-mono whitespace-nowrap ${log.value >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {log.value !== 0 ? formatCurrency(log.value) : '-'}
                   </span>
                 </div>
