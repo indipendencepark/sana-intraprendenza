@@ -611,7 +611,7 @@ export default function App() {
 
   // --- Actions ---
 
-  const addLog = (
+const addLog = (
     newData: AppDataState,
     type: TransactionType,
     description: string,
@@ -619,6 +619,8 @@ export default function App() {
     options: { meta?: Record<string, any>, locked?: boolean } = {}
   ) => {
     const user = INITIAL_USERS.find(u => u.id === currentUser)?.name || 'Sconosciuto';
+    
+    // CORREZIONE: Creiamo l'oggetto evitando valori 'undefined' che bloccano Firestore
     const newLog: LogEntry = {
       id: crypto.randomUUID(),
       timestamp: Date.now(),
@@ -626,9 +628,18 @@ export default function App() {
       type,
       description,
       value,
-      meta: options.meta,
-      locked: options.locked
     };
+
+    // Aggiungi meta solo se esiste
+    if (options.meta) {
+      newLog.meta = options.meta;
+    }
+
+    // Aggiungi locked solo se è definito (true o false)
+    if (options.locked !== undefined) {
+      newLog.locked = options.locked;
+    }
+
     const existingLogs = Array.isArray(newData.logs) ? newData.logs : [];
     return { ...newData, logs: [newLog, ...existingLogs] };
   };
