@@ -10,6 +10,7 @@ import {
   TrendingDown,
   Sparkles,
   X,
+  Filter,
   Pencil,
   Trash2,
   ClipboardCheck,
@@ -1410,6 +1411,8 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
+
 
     const filteredLogs = useMemo(() => {
       return data.logs.filter(log => {
@@ -1435,40 +1438,54 @@ const processSale = (productId: string, targetUserId: string, isCash: boolean, g
 
     return (
       <div className="space-y-4 pb-24">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h2 className="text-2xl font-bold text-brand-light">Registro Attività</h2>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <select
-              value={typeFilter}
-              onChange={e => setTypeFilter(e.target.value as TransactionType | 'ALL')}
-              className="bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2 flex-1"
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-2xl font-bold text-brand-light">Registro Attività</h2>
+            <Button
+              variant="secondary"
+              className="text-sm"
+              onClick={() => setShowFilters((prev) => !prev)}
             >
-              {typeOptions.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <input
-              type="text"
-              placeholder="Cerca descrizione"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2 flex-1"
-            />
+              {showFilters ? <X className="w-4 h-4" /> : <Filter className="w-4 h-4" />}
+              {showFilters ? 'Nascondi filtri' : 'Mostra filtri'}
+            </Button>
           </div>
-          <div className="grid grid-cols-2 gap-2 w-full">
-            <input
-              type="date"
-              value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              className="bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
-            />
-            <input
-              type="date"
-              value={endDate}
-              onChange={e => setEndDate(e.target.value)}
-              className="bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
-            />
-          </div>
+          
+          {showFilters && (
+            <div className="space-y-2">
+              <select
+                value={typeFilter}
+                onChange={e => setTypeFilter(e.target.value as TransactionType | 'ALL')}
+                className="w-full bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
+              >
+                {typeOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+
+              <input
+                type="text"
+                placeholder="Cerca descrizione"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
+              />
+
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="w-full bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
+              />
+
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="w-full bg-brand-input border border-brand-light/10 text-sm text-brand-light rounded-lg px-3 py-2"
+              />
+            </div>
+          )}
         </div>
 
         <div className="space-y-4">
